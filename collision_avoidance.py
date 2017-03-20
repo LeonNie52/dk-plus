@@ -21,7 +21,7 @@ Context = namedtuple('Context', ['mode', 'mission', 'next_wp'])
 
 
 class CollisionThread(threading.Thread):
-    def __init__(self, network, algorithm=None, single=True, interval=0.1, duration=0.25):
+    def __init__(self, network, algorithm=None, single=True, interval=0.05, duration=0.1):
         threading.Thread.__init__(self)
         self.daemon = True
         self.network = network
@@ -70,7 +70,6 @@ class CollisionThread(threading.Thread):
 
             time.sleep(self.network.POLL_RATE)
 
-
     """A Collision Avoidance API"""
 
     def formation_protocol(self):
@@ -91,11 +90,11 @@ class CollisionThread(threading.Thread):
             if not self.formation.home_returned:
                 self.changePos("POSHOLD")
 
-                # time.sleep(self.waitingtime)
-                #
-                # self.formation.ChangetoHome()
-                #
-                # self.changePos("GUIDED")
+                time.sleep(self.waitingtime)
+
+                self.formation.ChangetoHome()
+
+                self.changePos("GUIDED")
 
     def no_protocol(self):
         # What to do if no protocol is specified
@@ -371,13 +370,11 @@ class CollisionThread(threading.Thread):
                 for drone in self.teammate:
                     logging.info("=========================================================")
                     logging.info("== Teammate drone; SYSID_THISMAV: %s !", drone.SYSID_THISMAV)
-                    logging.info("== Time stamp last received: %s", drone.last_recv)
-                    logging.info("== Distance: %s",
-                                 geo.get_distance_metres(own_lat, own_lon, drone.global_lat, drone.global_lon))
+                    logging.info("== Distance: %s", geo.get_distance_metres(own_lat,
+                                                                            own_lon,
+                                                                            drone.global_lat,
+                                                                            drone.global_lon))
                     logging.info("== Velocity: %s", drone.velocity)
-                    logging.info("== Cental Velocity: %s", self.formation.get_cenVel(self.teammate))
-                    logging.info("== Position: %s %s %s", drone.global_lat, drone.global_lon, drone.global_alt)
-                    logging.info("== Cental Positon: %s", self.formation.get_cenPos(self.teammate))
                     logging.info("=========================================================")
 
     def current_mission(self):
