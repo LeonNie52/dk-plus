@@ -18,10 +18,12 @@ class Formation:
         self.MaxLeadForce = 10
         self.MaxForce = 10
 
-        self.leadForce_K = 1
+        self.safeDistance_K = 0.6
+        self.leadForce_K = 1.5
         self.dampForce_K = -1.0
-        self.FormationForce_K = 0.5*10e3
-        self.AvoidanceForce_K = 2*10
+        # self.FormationForce_K = 0.5 * 10e3
+        self.FormationForce_K = 0.1
+        self.AvoidanceForce_K = 2.0
 
         self.TeamHomeLocation = None
         self.targetLocation = None
@@ -48,7 +50,7 @@ class Formation:
         """
         self.TeamHomeLocation = get_location_metres(lat,
                                                     lon,
-                                                    alt, 0, 0)
+                                                    0, 0, 0)
 
         self.targetLocation = get_location_metres(lat,
                                                   lon,
@@ -66,6 +68,11 @@ class Formation:
                                    self.targetLocation.lon)
 
     def getPosition(self, teammate):
+        """
+        Return self target position in Team
+        :param teammate: 
+        :return: 
+        """
         x, y, z = self.get_cenPos(teammate)
 
         Vx, Vy, Vz = self.get_cenVel(teammate)
@@ -96,12 +103,12 @@ class Formation:
         c = self.FormationPosition[:, int(self.network.vehicle_params.SYSID_THISMAV - 1)].reshape(3, 1)
         abPos = np.array(Rotaz * Rotax * c).ravel()
 
-        logging.debug("Local Formation Position : %s", abPos)
+        # logging.debug("Local Formation Position : %s", abPos)
 
         Pos = np.array(get_location_formation(x,
                                               y,
                                               z, abPos[0], abPos[1], abPos[2]))
-        logging.debug("Global Formation Position : %s", Pos)
+        # logging.debug("Global Formation Position : %s", Pos)
 
         return Pos
 
@@ -138,17 +145,35 @@ class Formation:
 
     def LeadForce(self, teammate, single):
         if len(teammate) == 0 or single:
-            cenPos = np.array([self.network.vehicle_params.global_lat,
-                               self.network.vehicle_params.global_lon])
-            cenAlt = np.array([self.network.vehicle_params.global_alt])
+            cenPos_NED = get_location_NED(self.TeamHomeLocation,
+                                          self.network.vehicle_params.global_lat,
+                                          self.network.vehicle_params.global_lon,
+                                          self.network.vehicle_params.global_alt)
+
+            # cenPos = np.array([self.network.vehicle_params.global_lat,
+            #                    self.network.vehicle_params.global_lon])
+            # cenAlt = np.array([self.network.vehicle_params.global_alt])
         else:
-            cenPos = self.get_cenPos(teammate)[0:2]
-            cenAlt = self.get_cenPos(teammate)[-1]
+            cenPos_NED = get_location_NED(self.TeamHomeLocation,
+                                          self.get_cenPos(teammate)[0],
+                                          self.get_cenPos(teammate)[1],
+                                          self.get_cenPos(teammate)[2])
 
-        tarPos = np.array([self.targetLocation.lat,
-                           self.targetLocation.lon])
+            # cenPos = self.get_cenPos(teammate)[0:2]
+            # cenAlt = self.get_cenPos(teammate)[-1]
 
-        tarAlt = np.array([self.targetLocation.lat])
+        cenPos = np.array([cenPos_NED.north, cenPos_NED.east])
+        tarPos_NED = get_location_NED(self.TeamHomeLocation,
+                                      self.targetLocation.lat,
+                                      self.targetLocation.lon,
+                                      self.targetLocation.alt)
+        tarPos = np.array([tarPos_NED.north, tarPos_NED.east])
+        # tarPos = np.array([self.targetLocation.lat,
+        #                    self.targetLocation.lon])
+        #
+        # tarAlt = np.array([self.targetLocation.lat])
+
+        logging.debug("Center_Position: %s ; Target_Position: %s ;", cenPos, tarPos)
 
         leadforce = self.leadForce_K * (tarPos - cenPos) / np.linalg.norm(tarPos - cenPos)
 
@@ -158,25 +183,34 @@ class Formation:
         # For now ,no force on altitude
         leadforce = np.append(leadforce, np.zeros(1, ))
 
-        logging.debug("Center_Position: %s ; Target_Position: %s ;", self.get_cenPos(teammate), tarPos)
-
         return leadforce
 
     def FormationForce(self, teammate, single):
         if len(teammate) == 0 or single:
             FormationForce = 0
         else:
-            ownPos = np.array([self.network.vehicle_params.global_lat,
-                               self.network.vehicle_params.global_lon])
+            ownPos_NED = get_location_NED(self.TeamHomeLocation,
+                                          self.network.vehicle_params.global_lat,
+                                          self.network.vehicle_params.global_lon,
+                                          self.network.vehicle_params.global_alt)
+            ownPos = np.array([ownPos_NED.north, ownPos_NED.east])
 
-            ownAlt = np.array([self.network.vehicle_params.global_alt])
+            ownAlt = np.array([ownPos_NED.down])
 
-            Formation_position = self.getPosition(teammate)
+            forPos = self.getPosition(teammate)
 
+            formationPos_NED = get_location_NED(self.TeamHomeLocation,
+                                                forPos[0], forPos[1], forPos[2])
+
+            Formation_position = np.array([formationPos_NED.north,
+                                           formationPos_NED.east,
+                                           formationPos_NED.down])
+
+            # FormationForce = self.FormationForce_K * (Formation_position[0:2] - ownPos) / np.linalg.norm(
+            #     Formation_position[0:2] - ownPos)
             FormationForce = self.FormationForce_K * (Formation_position[0:2] - ownPos)
-
             # For now ,no force on altitude
-            FormationForce = np.append(FormationForce, 0)
+            FormationForce = np.append(FormationForce, [0])
 
             logging.debug("Own Position: %s", np.hstack((ownPos, ownAlt)))
 
@@ -193,47 +227,62 @@ class Formation:
         if len(teammate) == 0 or single:
             return force
         else:
-            ownPos = np.array([self.network.vehicle_params.global_lat,
-                               self.network.vehicle_params.global_lon])
+
+            ownPos_NED = get_location_NED(self.TeamHomeLocation,
+                                          self.network.vehicle_params.global_lat,
+                                          self.network.vehicle_params.global_lon,
+                                          self.network.vehicle_params.global_alt)
+            ownPos = np.array([ownPos_NED.north, ownPos_NED.east])
             ownVel = np.array(self.network.vehicle_params.velocity)
 
             for drone in teammate:
-                distance = get_distance_metres(self.network.vehicle_params.global_lat,
-                                               self.network.vehicle_params.global_lon,
-                                               drone.global_lat,
-                                               drone.global_lon)
 
-                objPos = np.array([drone.global_lat, drone.global_lon])
+                objPos_NED = get_location_NED(self.TeamHomeLocation,
+                                              drone.global_lat,
+                                              drone.global_lon,
+                                              drone.global_alt)
+                objPos = np.array([objPos_NED.north, objPos_NED.east])
+                #
+                # distanceWGS = get_distance_metres(self.network.vehicle_params.global_lat,
+                #                                   self.network.vehicle_params.global_lon,
+                #                                   drone.global_lat,
+                #                                   drone.global_lon)
+
+                distanceNED = get_distance_NED(objPos_NED, ownPos_NED)
+
                 objVel = np.array(drone.velocity)
 
                 relvel = (ownVel - objVel)[0:2]  # no force on the altitude
                 dis = objPos - ownPos
 
-                # val = np.dot(relvel, dis) / np.linalg.norm(dis)
+                val = np.dot(relvel, dis) / np.linalg.norm(dis)
 
-                Rsav = self.network.FORMATION_NEAR_ZONE  # original version
+                if val > 0:
+                    Rsav = self.network.FORMATION_NEAR_ZONE + self.safeDistance_K  * val
+                else:
+                    Rsav = self.network.FORMATION_NEAR_ZONE  # original version
 
-                if distance > Rsav:
+                if distanceNED > Rsav:
                     single_force = 0  # avoid force generated by single object
                 else:
 
                     angle = self.calcos(relvel, dis)
 
-                    single_force_K = self.AvoidanceForce_K * Rsav * (1 / distance - 1 / Rsav)
+                    single_force_K = self.AvoidanceForce_K * Rsav * (1 / distanceNED - 1 / Rsav)
 
                     single_force_ = -single_force_K * dis / np.linalg.norm(dis)
 
                     single_force = single_force_ + (relvel / np.linalg.norm(relvel)
                                                     * np.linalg.norm(single_force_) * np.cos(angle))
-                    # single_force *= val
+                    single_force *= val
 
                     # For now ,no force on altitude
                     single_force = np.append(single_force, np.zeros(1, ))
 
                     logging.info("Drone: %s too close. Avoidance Force Activated!!!",
                                  drone.SYSID_THISMAV)
-                    logging.info("single Avoidance Force: %s", single_force)
-                    logging.info("Safety distance: %s", Rsav)
+                    logging.debug("single Avoidance Force: %s", single_force)
+                    logging.debug("Safety distance: %s", Rsav)
                 force += single_force
 
             return force
@@ -294,12 +343,11 @@ class Formation:
 
         LeadForce = self.LeadForce(teammate, single)
         FormationForce = self.FormationForce(teammate, single)
-        # AvoidanceForce = self.AvoidanceForce(teammate, single)
-        AvoidanceForce = self.origin_AvoidanceForce(teammate, single)
+        AvoidanceForce = self.AvoidanceForce(teammate, single)
+        # AvoidanceForce = self.origin_AvoidanceForce(teammate, single)
         DampForce = self.DampForce()
 
-        # force = LeadForce + FormationForce + AvoidanceForce + DampForce
-        force = LeadForce + FormationForce + DampForce
+        force = LeadForce + FormationForce + AvoidanceForce + DampForce
 
         logging.debug("Lead force: %s", LeadForce)
         logging.debug("Formation force: %s ", FormationForce)
@@ -314,7 +362,8 @@ class Formation:
         return total_force
 
     def SendVelocity(self, teammate, single):
-        add_vel = self.TotalForce(teammate, single) * self.network.POLL_RATE
+        add_vel = self.TotalForce(teammate, single) * self.network.POLL_RATE * 10
+        # add_vel = self.TotalForce(teammate, single) * 0.1
         velocity = np.array(self.network.vehicle_params.velocity) + add_vel
 
         # For now Vz=0

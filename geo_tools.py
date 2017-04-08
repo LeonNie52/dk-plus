@@ -1,4 +1,4 @@
-from dronekit import LocationGlobal, LocationGlobalRelative
+from dronekit import LocationGlobal, LocationGlobalRelative, LocationLocal
 import math
 
 
@@ -22,7 +22,25 @@ def get_location_metres(lat, lon, alt, dNorth, dEast):
     # New position in decimal degrees
     newlat = lat + (dLat * 180 / math.pi)
     newlon = lon + (dLon * 180 / math.pi)
-    return LocationGlobal(newlat, newlon, alt)
+    return LocationGlobalRelative(newlat, newlon, alt)
+
+
+def get_location_NED(homelocation, lat, lon, alt):
+    """
+    Return current position in NED frame relate to home location
+    :param homelocation: 
+    :param lat: 
+    :param lon: 
+    :param alt: 
+    :return: 
+    """
+    earth_radius = 6378137.0  # Radius of "spherical" earth
+    dLat = lat - homelocation.lat
+    dLon = lon - homelocation.lon
+    dNorth = dLat * (math.pi / 180) * earth_radius
+    dEast = dLon * (math.pi / 180) * (earth_radius * math.cos(math.pi * homelocation.lat / 180))
+    dDown = alt - homelocation.alt
+    return LocationLocal(dNorth, dEast, dDown)
 
 
 def get_location_formation(lat, lon, alt, dNorth, dEast, newalt):
@@ -62,6 +80,22 @@ def get_distance_metres(lat1, lon1, lat2, lon2):
     dlong = lon2 - lon1
 
     return math.sqrt((dlat * dlat) + (dlong * dlong)) * 1.113195e5
+
+
+def get_distance_NED(aLocation1, aLocation2):
+    """
+    Returns the ground distance in metres between two NED objects.
+
+    This method is an approximation, and will not be accurate over large distances and close to the 
+    earth's poles. It comes from the ArduPilot test code: 
+    https://github.com/diydrones/ardupilot/blob/master/Tools/autotest/common.py
+    """
+    dNorth = aLocation2.north - aLocation1.north
+    dEast = aLocation2.east - aLocation1.east
+    dDown = aLocation2.down - aLocation1.down
+
+    # Temporary not consider distance in vertical
+    return math.sqrt((dNorth ** 2) + (dEast ** 2))
 
 
 def distance_to_current_waypoint(vehicle):

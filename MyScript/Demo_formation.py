@@ -69,7 +69,7 @@ print " Autopilot Firmware version: %s" % vehicle.version
 print "System ID：%s" % vehicle.parameters['SYSID_THISMAV']
 
 # Set the targetLocation for the team, Heading South
-t_collision.formation.set_target_Loc(lat=39.979352, lon=116.339748, alt=10, dNorth=-50, dEast=0)
+t_collision.formation.set_target_Loc(lat=39.979352, lon=116.339748, alt=10, dNorth=-100, dEast=0)
 
 # t_collision.formation.setFormation(np.array([[-20, 0, 20],
 #                                              [0, 0, 0],
