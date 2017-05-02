@@ -8,7 +8,6 @@ Author: Leonidas Antoniou
 mail: leonidas.antoniou@gmail.com
 """
 from multiprocessing import Process
-import numpy as np
 import threading, time, itertools, logging
 import geo_tools as geo
 from dronekit import VehicleMode, Command
@@ -34,8 +33,6 @@ class CollisionThread(threading.Thread):
         self.context = None
         self.interval = interval  # send velocity interval
         self.duration = duration  # send velocity duration
-
-        self.waitingtime = 10  # waiting after reach the target
 
         self.formation = Formation(self.network)
         self.single = single  # For one UAV in formation
@@ -66,6 +63,10 @@ class CollisionThread(threading.Thread):
             elif self.algorithm == 'formation':
                 self.formation_protocol()
 
+            elif self.algorithm == 'landing':
+                self.landing_protocol()
+            elif self.algorithm == 'ownlanding':
+                self.ownlanding_protocol()
             else:
                 pass
 
@@ -79,23 +80,64 @@ class CollisionThread(threading.Thread):
 
         self.print_drones_in_vicinity()
 
-        if self.network.vehicle_params.mode == "RTL":
+        if self.network.vehicle_params.mode == "POSHOLD":
             return
 
-        elif self.formation.target_reached and self.formation.home_returned:
-            self.changePos("RTL")
+        if self.network.vehicle_params.mode == "RTL" or self.network.vehicle_params.mode == "LAND":
+            return
 
-        if not self.formation.reachTarget(self.teammate, self.single):
-            self.APF_formation()
+        if not self.formation.target_reached:
+            self.reachTarget()  # Check if reach Targets
+
+        if not self.formation.home_returned and self.formation.home_returning:
+            self.reachHome()  # Check if return home location
+
+        if self.formation.target_reached and self.formation.home_returned:
+            self.algorithm = 'ownlanding'
+            logging.info("Algorithm ownLanding activated")
         else:
-            if not self.formation.home_returned:
-                self.changePos("POSHOLD")
+            self.APF_formation(gotohome=False)
 
-                time.sleep(self.waitingtime)
+    def landing_protocol(self):
+        """
+        Without formation force, and change to LAND after reaching the Team home position
+        :return: 
+        """
+        self.update_drone_list()
 
-                self.formation.ChangetoHome()
+        self.print_drones_in_vicinity()
 
-                self.changePos("GUIDED")
+        if self.network.vehicle_params.mode == "POSHOLD":
+            return
+
+        if self.network.vehicle_params.mode == "RTL" or self.network.vehicle_params.mode == "LAND":
+            return
+
+        else:
+            self.changeMode("LAND")
+
+    def ownlanding_protocol(self):
+        """
+        Without formation force, and change to RTL after reaching the own home position
+        :return: 
+        """
+        self.update_drone_list()
+
+        self.print_drones_in_vicinity()
+
+        if self.network.vehicle_params.mode == "RTL" or self.network.vehicle_params.mode == "LAND":
+            return
+
+        if not self.formation.ownhome_returned:
+            self.reach_ownHome()
+        else:
+            if self.network.vehicle_params.mode is not "POSHOLD":
+                self.changeMode("POSHOLD")
+
+        if self.readytoLand():
+            self.changeMode("RTL")
+        else:
+            self.APF_formation(gotohome=True)
 
     def no_protocol(self):
         # What to do if no protocol is specified
@@ -345,7 +387,7 @@ class CollisionThread(threading.Thread):
     def print_drones_in_vicinity(self):
         # Print drone IDs that are in close and critical range
         # Inform if no such drones are found
-        logging.info("Distance to target: %s", self.formation.get_distance2target())
+        logging.debug("Distance to target: %s", self.formation.get_distance2target())
         if len(self.near) == 0 and len(self.critical) == 0 and len(self.teammate) == 0:
             # print "No dangerous drones found"
             pass
@@ -354,9 +396,9 @@ class CollisionThread(threading.Thread):
             own_lat = self.network.vehicle_params.global_lat
             own_lon = self.network.vehicle_params.global_lon
             ownPos_NED = geo.get_location_NED(self.formation.TeamHomeLocation,
-                                                  self.network.vehicle_params.global_lat,
-                                                  self.network.vehicle_params.global_lon,
-                                                  self.network.vehicle_params.global_alt)
+                                              self.network.vehicle_params.global_lat,
+                                              self.network.vehicle_params.global_lon,
+                                              self.network.vehicle_params.global_alt)
 
             if self.algorithm == 'priorities':
                 for drone in self.near:
@@ -377,15 +419,15 @@ class CollisionThread(threading.Thread):
                                                       drone.global_lat,
                                                       drone.global_lon,
                                                       drone.global_alt)
-                    logging.info("=========================================================")
-                    logging.info("== Teammate drone; SYSID_THISMAV: %s !", drone.SYSID_THISMAV)
-                    logging.info("== DistanceWGS: %s", geo.get_distance_metres(own_lat,
-                                                                               own_lon,
-                                                                               drone.global_lat,
-                                                                               drone.global_lon))
-                    logging.info("== DistanceNED: %s", geo.get_distance_NED(objPos_NED, ownPos_NED))
-                    logging.info("== Velocity: %s", drone.velocity)
-                    logging.info("=========================================================")
+                    logging.debug("=========================================================")
+                    logging.debug("== Teammate drone; SYSID_THISMAV: %s !", drone.SYSID_THISMAV)
+                    logging.debug("== DistanceWGS: %s", geo.get_distance_metres(own_lat,
+                                                                                own_lon,
+                                                                                drone.global_lat,
+                                                                                drone.global_lon))
+                    logging.debug("== DistanceNED: %s", geo.get_distance_NED(objPos_NED, ownPos_NED))
+                    logging.debug("== Velocity: %s", drone.velocity)
+                    logging.debug("=========================================================")
 
     def current_mission(self):
         # Retrieves current mission of vehicle
@@ -422,7 +464,7 @@ class CollisionThread(threading.Thread):
         At time of writing, acceleration and yaw bits are ignored.
         """
 
-        logging.info("NED Frame Velocity send: %s", [velocity_x, velocity_y, velocity_z])
+        logging.debug("NED Frame Velocity send: %s", [velocity_x, velocity_y, velocity_z])
 
         msg = self.network.vehicle.message_factory.set_position_target_local_ned_encode(
             0,  # time_boot_ms (not used)
@@ -454,9 +496,9 @@ class CollisionThread(threading.Thread):
                     velocity_z = drone.velocity[2]
                     self.send_ned_velocity(velocity_x, velocity_y, velocity_z)
 
-    def APF_formation(self):
+    def APF_formation(self, gotohome=False):
 
-        velocity_x, velocity_y, velocity_z = self.formation.SendVelocity(self.teammate, self.single)
+        velocity_x, velocity_y, velocity_z = self.formation.SendVelocity(self.teammate, self.single, gotohome)
 
         self.send_ned_velocity(velocity_x, velocity_y, velocity_z)
         # self.send_global_velocity(velocity_x, velocity_y, velocity_z)
@@ -487,9 +529,9 @@ class CollisionThread(threading.Thread):
                     arm_and_takeoff(self.network.vehicle)
                     break
 
-    def changePos(self, mode):
+    def changeMode(self, mode):
         """
-        Change mode to Poshold
+        Change mode to Poshold or Guided
         :return:
         """
 
@@ -501,5 +543,25 @@ class CollisionThread(threading.Thread):
         if mode == "GUIDED":
             # Cancel RC override
             self.network.vehicle.channels.overrides['3'] = None
-
+        logging.info("Mode changed to: %s", mode)
         return
+
+    def reachTarget(self):
+        return self.formation.reachTarget(self.teammate, self.single)
+
+    def reachHome(self):
+        return self.formation.reachHome(self.teammate, self.single)
+
+    def reach_ownHome(self):
+        return self.formation.reach_ownHome()
+
+    def readytoLand(self):
+        if not self.network.vehicle_params.readytoLand:
+            self.formation.ownReadytoLand()
+        if not self.single:
+            result = self.network.vehicle_params.readytoLand
+            for drone in self.teammate:
+                result = result and drone.readytoLand
+            return result
+        else:
+            return self.network.vehicle_params.readytoLand

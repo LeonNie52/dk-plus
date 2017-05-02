@@ -30,15 +30,28 @@ class Formation:
         self.FormationPosition = None
 
         self.target_reached = False
+        self.home_returned = False  # For team
+        self.ownhome_returned = False  # For self unit
+        self.home_returning = False  # For team when flying home location
 
-        self.home_returned = False
+        self.distancePrecise = 10  # in meters
+        self.distance_ownPrecise = 5
 
-        self.distancePrecise = 5  # in meters
-
-    def setFormation(self, formation_set):
+    def setFormation(self, lat, lon, formation_set):
+        """
+        Altitude for home location is referred to ZERO
+        :param lat: 
+        :param lon: 
+        :param formation_set: 
+        :return: 
+        """
         self.FormationPosition = np.matrix(formation_set)
+        self.TeamHomeLocation = get_location_metres(lat,
+                                                    lon,
+                                                    0, 0, 0)
+        logging.info("Team Home Location set: %s", self.TeamHomeLocation)
 
-    def set_target_Loc(self, lat, lon, alt, dNorth, dEast):
+    def set_target_Loc(self, alt, dNorth, dEast):
         """
         Target Location. Set before taking off
         :param lat: original latitude
@@ -48,14 +61,26 @@ class Formation:
         :param dEast:
         :return:
         """
-        self.TeamHomeLocation = get_location_metres(lat,
-                                                    lon,
-                                                    0, 0, 0)
 
-        self.targetLocation = get_location_metres(lat,
-                                                  lon,
+        self.targetLocation = get_location_metres(self.TeamHomeLocation.lat,
+                                                  self.TeamHomeLocation.lon,
                                                   alt, dNorth, dEast)
+        self.target_reached = False
+        logging.info("Target Location set: %s", self.targetLocation)
 
+    def set_owntarget_Loc(self, target):
+        """
+        Target Location. Set before taking off
+        :param lat: original latitude
+        :param lon: original longitude
+        :param alt: Target altitude
+        :param dNorth:
+        :param dEast:
+        :return:
+        """
+
+        self.targetLocation = target
+        self.target_reached = False
         logging.info("Target Location set: %s", self.targetLocation)
 
     def get_target_Loc(self):
@@ -185,6 +210,39 @@ class Formation:
 
         return leadforce
 
+    def ReturnForce(self):
+        cenPos_NED = get_location_NED(self.TeamHomeLocation,
+                                      self.network.vehicle_params.global_lat,
+                                      self.network.vehicle_params.global_lon,
+                                      self.network.vehicle_params.global_alt)
+
+        # cenPos = np.array([self.network.vehicle_params.global_lat,
+        #                    self.network.vehicle_params.global_lon])
+        # cenAlt = np.array([self.network.vehicle_params.global_alt])
+
+        cenPos = np.array([cenPos_NED.north, cenPos_NED.east])
+        tarPos_NED = get_location_NED(self.TeamHomeLocation,
+                                      self.network.vehicle_params.home_location.lat,
+                                      self.network.vehicle_params.home_location.lon,
+                                      self.network.vehicle_params.home_location.alt)
+        tarPos = np.array([tarPos_NED.north, tarPos_NED.east])
+        # tarPos = np.array([self.targetLocation.lat,
+        #                    self.targetLocation.lon])
+        #
+        # tarAlt = np.array([self.targetLocation.lat])
+
+        logging.debug("Center_Position: %s ; Target_Position: %s ;", cenPos, tarPos)
+
+        returnforce = self.leadForce_K * (tarPos - cenPos) / np.linalg.norm(tarPos - cenPos)
+
+        if np.linalg.norm(returnforce) > self.MaxLeadForce:
+            returnforce = returnforce * self.MaxLeadForce / np.linalg.norm(returnforce)
+
+        # For now ,no force on altitude
+        returnforce = np.append(returnforce, np.zeros(1, ))
+
+        return returnforce
+
     def FormationForce(self, teammate, single):
         if len(teammate) == 0 or single:
             FormationForce = 0
@@ -258,7 +316,7 @@ class Formation:
                 val = np.dot(relvel, dis) / np.linalg.norm(dis)
 
                 if val > 0:
-                    Rsav = self.network.FORMATION_NEAR_ZONE + self.safeDistance_K  * val
+                    Rsav = self.network.FORMATION_NEAR_ZONE + self.safeDistance_K * val
                 else:
                     Rsav = self.network.FORMATION_NEAR_ZONE  # original version
 
@@ -279,8 +337,8 @@ class Formation:
                     # For now ,no force on altitude
                     single_force = np.append(single_force, np.zeros(1, ))
 
-                    logging.info("Drone: %s too close. Avoidance Force Activated!!!",
-                                 drone.SYSID_THISMAV)
+                    logging.info("Drone: %s too close! Distance: %s . Avoidance Force Activated!!!",
+                                 drone.SYSID_THISMAV, distanceNED)
                     logging.debug("single Avoidance Force: %s", single_force)
                     logging.debug("Safety distance: %s", Rsav)
                 force += single_force
@@ -339,20 +397,30 @@ class Formation:
         angle = np.arccos(cos_angle)
         return angle
 
-    def TotalForce(self, teammate, single):
+    def TotalForce(self, teammate, single, gotohome):
 
-        LeadForce = self.LeadForce(teammate, single)
-        FormationForce = self.FormationForce(teammate, single)
         AvoidanceForce = self.AvoidanceForce(teammate, single)
         # AvoidanceForce = self.origin_AvoidanceForce(teammate, single)
         DampForce = self.DampForce()
 
-        force = LeadForce + FormationForce + AvoidanceForce + DampForce
+        if gotohome:
+            ReturnForce = self.ReturnForce()
 
-        logging.debug("Lead force: %s", LeadForce)
-        logging.debug("Formation force: %s ", FormationForce)
-        logging.debug("Avoidance Force: %s", AvoidanceForce)
-        logging.debug("Damp Force: %s", DampForce)
+            force = ReturnForce + AvoidanceForce + DampForce
+
+            logging.debug("Return force: %s", ReturnForce)
+            logging.debug("Avoidance Force: %s", AvoidanceForce)
+            logging.debug("Damp Force: %s", DampForce)
+        else:
+            LeadForce = self.LeadForce(teammate, single)
+            FormationForce = self.FormationForce(teammate, single)
+
+            force = LeadForce + FormationForce + AvoidanceForce + DampForce
+
+            logging.debug("Lead force: %s", LeadForce)
+            logging.debug("Formation force: %s ", FormationForce)
+            logging.debug("Avoidance Force: %s", AvoidanceForce)
+            logging.debug("Damp Force: %s", DampForce)
 
         if np.linalg.norm(force) > self.MaxForce:
             force = force * self.MaxForce / np.linalg.norm(force)
@@ -361,8 +429,8 @@ class Formation:
         logging.debug("Total force: %s ", total_force)
         return total_force
 
-    def SendVelocity(self, teammate, single):
-        add_vel = self.TotalForce(teammate, single) * self.network.POLL_RATE * 10
+    def SendVelocity(self, teammate, single, gotohome):
+        add_vel = self.TotalForce(teammate, single, gotohome) * self.network.POLL_RATE * 10
         # add_vel = self.TotalForce(teammate, single) * 0.1
         velocity = np.array(self.network.vehicle_params.velocity) + add_vel
 
@@ -404,13 +472,19 @@ class Formation:
             return self.reachHome(teammate, single)
 
     def reachHome(self, teammate, single):
+        """
+        Check if reach the Team Home Location
+        :param teammate: 
+        :param single: 
+        :return: 
+        """
         if single:
             if get_distance_metres(self.network.vehicle_params.global_lat,
                                    self.network.vehicle_params.global_lon,
                                    self.TeamHomeLocation.lat,
                                    self.TeamHomeLocation.lon) < self.distancePrecise:
                 self.home_returned = True
-                logging.info("Reach  Home Location!!")
+                logging.info("Reach Single Home Location!!")
                 return True
             else:
                 return False
@@ -420,10 +494,27 @@ class Formation:
                                    self.TeamHomeLocation.lat,
                                    self.TeamHomeLocation.lon) < self.distancePrecise:
                 self.home_returned = True
-                logging.info("Reach  Home Location!!")
+                logging.info("Reach Team Home Location!!")
                 return True
             else:
                 return False
+
+    def reach_ownHome(self):
+        if get_distance_metres(self.network.vehicle_params.global_lat,
+                               self.network.vehicle_params.global_lon,
+                               self.network.vehicle_params.home_location.lat,
+                               self.network.vehicle_params.home_location.lon) < self.distance_ownPrecise:
+            self.ownhome_returned = True
+            logging.info("Reached Own Home Location!!")
+            return True
+        else:
+            return False
+
+    def ownReadytoLand(self):
+        if self.ownhome_returned and self.network.vehicle_params.mode == "POSHOLD":
+            self.network.vehicle_params.readytoLand = True
+            logging.info("SYSID: %s is ready to Land!!", self.network.vehicle_params.SYSID_THISMAV)
+
 
     def ChangetoHome(self):
         """
@@ -431,4 +522,5 @@ class Formation:
         :return:
         """
         self.targetLocation = self.TeamHomeLocation
-        logging.info("Return to home Location")
+        self.home_returning = True
+        logging.info("Returning to home Location")

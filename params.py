@@ -55,6 +55,9 @@ class Params:
             self.set_global_alt = vehicle.capabilities.set_altitude_target_global_int
             self.set_attitude = vehicle.capabilities.set_attitude_target
             self.mode = vehicle.mode.name
+
+            self.home_location = vehicle.home_location
+
             self.global_alt = vehicle.location.global_relative_frame.alt
             self.global_lat = vehicle.location.global_relative_frame.lat
             self.global_lon = vehicle.location.global_relative_frame.lon
@@ -71,6 +74,7 @@ class Params:
             self.airspeed = vehicle.airspeed  # m/s
             self.system_status = vehicle.system_status.state
             self.armed = vehicle.armed
+            self.readytoLand = False
 
         self.add_listeners(network, vehicle)
 
