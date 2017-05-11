@@ -136,7 +136,7 @@ class CollisionThread(threading.Thread):
 
         if self.readytoLand():
             self.changeMode("RTL")
-        else:
+        if not self.network.vehicle_params.readytoLand:
             self.APF_formation(gotohome=True)
 
     def no_protocol(self):
