@@ -79,22 +79,28 @@ print " Autopilot Firmware version: %s" % vehicle.version
 print "System ID：%s" % vehicle.parameters['SYSID_THISMAV']
 
 # Set the targetLocation for the team, Heading South
+
 # t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
 #                                    formation_set=np.array([[-20, 0, 20],
 #                                                            [0, 0, 0],
 #                                                            [0, 0, 0]], dtype=float))
+#
+# t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
+#                                    formation_set=np.array([[-25, 25],
+#                                                            [0, 0],
+#                                                            [0, 0]], dtype=float))
 
-t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
-                                   formation_set=np.array([[-25, 25],
+t_collision.formation.setFormation(lat=39.9790234, lon=116.3407892,
+                                   formation_set=np.array([[-20, 20],
                                                            [0, 0],
                                                            [0, 0]], dtype=float))
 
-t_collision.formation.set_target_Loc(alt=10, dNorth=-50, dEast=0)
+t_collision.formation.set_target_Loc(alt=15, dNorth=-40, dEast=0)
 
 logging.info("Initializing interface")
 network.run()
 
-arm_and_takeoff(vehicle, 10)
+arm_and_takeoff(vehicle, 15)
 
 logging.info("Starting collision avoidance scheme")
 t_collision.start()
@@ -106,7 +112,6 @@ t_collision.changeMode("POSHOLD")
 
 logging.info("Hold Position for %s seconds", 10)
 time.sleep(10)
-
 
 t_collision.formation.ChangetoHome()
 

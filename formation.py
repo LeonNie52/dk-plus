@@ -337,7 +337,7 @@ class Formation:
                     # For now ,no force on altitude
                     single_force = np.append(single_force, np.zeros(1, ))
 
-                    logging.info("Drone: %s too close! Distance: %s . Avoidance Force Activated!!!",
+                    logging.warning("Drone: %s too close! Distance: %s . Avoidance Force Activated!!!",
                                  drone.SYSID_THISMAV, distanceNED)
                     logging.debug("single Avoidance Force: %s", single_force)
                     logging.debug("Safety distance: %s", Rsav)
@@ -378,7 +378,7 @@ class Formation:
                     # For now ,no force on altitude
                     single_force = np.append(single_force, np.zeros(1, ))
 
-                    logging.info("Drone: %s too close. Avoidance Force Activated!!!",
+                    logging.warning("Drone: %s too close. Avoidance Force Activated!!!",
                                  drone.SYSID_THISMAV)
                     logging.debug("original single Avoidance Force: %s", single_force)
 
