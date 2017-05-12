@@ -79,17 +79,18 @@ print " Autopilot Firmware version: %s" % vehicle.version
 print "System ID：%s" % vehicle.parameters['SYSID_THISMAV']
 
 # Set the targetLocation for the team, Heading South
-# t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
-#                                    formation_set=np.array([[-20, 0, 20],
-#                                                            [0, 0, 0],
-#                                                            [0, 0, 0]], dtype=float))
 
 t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
-                                   formation_set=np.array([[-25, 25],
-                                                           [0, 0],
-                                                           [0, 0]], dtype=float))
+                                   formation_set=np.array([[-25, 0, 25],
+                                                           [0, 0, 0],
+                                                           [0, 0, 0]], dtype=float))
 
-t_collision.formation.set_target_Loc(alt=10, dNorth=-50, dEast=0)
+# t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
+#                                    formation_set=np.array([[-25, 25],
+#                                                            [0, 0],
+#                                                            [0, 0]], dtype=float))
+
+t_collision.formation.set_target_Loc(alt=10, dNorth=-100, dEast=0)
 
 logging.info("Initializing interface")
 network.run()
