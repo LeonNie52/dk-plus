@@ -16,6 +16,10 @@ from pymavlink import mavutil
 from collections import namedtuple
 from act_tool import arm_and_takeoff
 from formation import Formation
+import logging.config
+
+logging.config.fileConfig("../logging.conf")
+logger = logging.getLogger()
 
 Context = namedtuple('Context', ['mode', 'mission', 'next_wp'])
 
@@ -44,10 +48,10 @@ class CollisionThread(threading.Thread):
         # Deploy your collision avoidance algorithm here
 
         if self.algorithm == 'priorities':
-            logging.info("Algorithm priorities activated")
+            logger.info("Algorithm priorities activated")
 
         elif self.algorithm == 'formation':
-            logging.info("Algorithm formation activated")
+            logger.info("Algorithm formation activated")
 
         else:
             pass
@@ -94,7 +98,7 @@ class CollisionThread(threading.Thread):
 
         if self.formation.target_reached and self.formation.home_returned:
             self.algorithm = 'ownlanding'
-            logging.info("Algorithm ownLanding activated")
+            logger.info("Algorithm ownLanding activated")
         else:
             self.APF_formation(gotohome=False)
 
@@ -276,7 +280,7 @@ class CollisionThread(threading.Thread):
 
         # Give RC command so that we can bypass RC failsafe, 1500 means stay steady
         self.network.vehicle.channels.overrides['3'] = 1500  # throttle
-        logging.info("Control taken!")
+        logger.info("Control taken!")
 
     def give_control(self):
         """Gives control by restoring to pre-avoidance state"""
@@ -289,7 +293,7 @@ class CollisionThread(threading.Thread):
 
         # End session
         self.in_session = False
-        logging.info("Control given!")
+        logger.info("Control given!")
 
     def save_context(self):
         """Currently keeping information about mode and mission"""
@@ -387,7 +391,7 @@ class CollisionThread(threading.Thread):
     def print_drones_in_vicinity(self):
         # Print drone IDs that are in close and critical range
         # Inform if no such drones are found
-        logging.debug("Distance to target: %s", self.formation.get_distance2target())
+        logger.debug("Distance to target: %s", self.formation.get_distance2target())
         if len(self.near) == 0 and len(self.critical) == 0 and len(self.teammate) == 0:
             # print "No dangerous drones found"
             pass
@@ -402,16 +406,16 @@ class CollisionThread(threading.Thread):
 
             if self.algorithm == 'priorities':
                 for drone in self.near:
-                    logging.info("Drone approaching! ID: %s ; SYSID_THISMAV: %s !", drone.ID, drone.SYSID_THISMAV)
-                    logging.info("Distance: %s",
+                    logger.info("Drone approaching! ID: %s ; SYSID_THISMAV: %s !", drone.ID, drone.SYSID_THISMAV)
+                    logger.info("Distance: %s",
                                  geo.get_distance_metres(own_lat, own_lon, drone.global_lat, drone.global_lon))
-                    logging.info("Velocity: %s", drone.velocity)
+                    logger.info("Velocity: %s", drone.velocity)
 
                 for drone in self.critical:
-                    logging.info("Drone too close!!!! ID: %s ; SYSID_THISMAV: %s !", drone.ID, drone.SYSID_THISMAV)
-                    logging.info("Distance: %s",
+                    logger.info("Drone too close!!!! ID: %s ; SYSID_THISMAV: %s !", drone.ID, drone.SYSID_THISMAV)
+                    logger.info("Distance: %s",
                                  geo.get_distance_metres(own_lat, own_lon, drone.global_lat, drone.global_lon))
-                    logging.info("Velocity: %s", drone.velocity)
+                    logger.info("Velocity: %s", drone.velocity)
 
             elif self.algorithm == 'formation':
                 for drone in self.teammate:
@@ -419,15 +423,15 @@ class CollisionThread(threading.Thread):
                                                       drone.global_lat,
                                                       drone.global_lon,
                                                       drone.global_alt)
-                    logging.debug("=========================================================")
-                    logging.debug("== Teammate drone; SYSID_THISMAV: %s !", drone.SYSID_THISMAV)
-                    logging.debug("== DistanceWGS: %s", geo.get_distance_metres(own_lat,
+                    logger.debug("=========================================================")
+                    logger.debug("== Teammate drone; SYSID_THISMAV: %s !", drone.SYSID_THISMAV)
+                    logger.debug("== DistanceWGS: %s", geo.get_distance_metres(own_lat,
                                                                                 own_lon,
                                                                                 drone.global_lat,
                                                                                 drone.global_lon))
-                    logging.debug("== DistanceNED: %s", geo.get_distance_NED(objPos_NED, ownPos_NED))
-                    logging.debug("== Velocity: %s", drone.velocity)
-                    logging.debug("=========================================================")
+                    logger.debug("== DistanceNED: %s", geo.get_distance_NED(objPos_NED, ownPos_NED))
+                    logger.debug("== Velocity: %s", drone.velocity)
+                    logger.debug("=========================================================")
 
     def current_mission(self):
         # Retrieves current mission of vehicle
@@ -443,7 +447,7 @@ class CollisionThread(threading.Thread):
                 priority_num = drone.priority
                 break
 
-        logging.info("Flying drone's priority number is: %s", priority_num)
+        logger.info("Flying drone's priority number is: %s", priority_num)
         return priority_num
 
     def send_ned_velocity(self, velocity_x, velocity_y, velocity_z):
@@ -464,7 +468,7 @@ class CollisionThread(threading.Thread):
         At time of writing, acceleration and yaw bits are ignored.
         """
 
-        logging.debug("NED Frame Velocity send: %s", [velocity_x, velocity_y, velocity_z])
+        logger.debug("NED Frame Velocity send: %s", [velocity_x, velocity_y, velocity_z])
 
         msg = self.network.vehicle.message_factory.set_position_target_local_ned_encode(
             0,  # time_boot_ms (not used)
@@ -518,14 +522,14 @@ class CollisionThread(threading.Thread):
             for drone in self.teammate:
                 if (drone.mode == "RTL" or drone.mode == "LAND") and drone.global_alt != 0:
                     # On the way to home location or landing
-                    logging.info("Drone: %s landing, Landing off", drone.SYSID_THISMAV)
+                    logger.info("Drone: %s landing, Landing off", drone.SYSID_THISMAV)
                     self.network.vehicle.mode = VehicleMode(drone.mode)
                     break
         # or it is on the land and the other's not landing
         else:
             for drone in self.teammate:
                 if drone.armed and drone.global_alt != 0 and drone.mode == 'GUIDED':
-                    logging.info("Drone: %s taken off. Taking off !! ", drone.SYSID_THISMAV)
+                    logger.info("Drone: %s taken off. Taking off !! ", drone.SYSID_THISMAV)
                     arm_and_takeoff(self.network.vehicle)
                     break
 
@@ -543,7 +547,7 @@ class CollisionThread(threading.Thread):
         if mode == "GUIDED":
             # Cancel RC override
             self.network.vehicle.channels.overrides['3'] = None
-        logging.info("Mode changed to: %s", mode)
+        logger.info("Mode changed to: %s", mode)
         return
 
     def reachTarget(self):

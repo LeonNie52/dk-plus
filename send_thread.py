@@ -1,6 +1,9 @@
 import threading, time, hashlib, socket, logging
 import cPickle as pickle
+import logging.config
 
+logging.config.fileConfig("../logging.conf")
+logger = logging.getLogger()
 
 class SendThread(threading.Thread):
     def __init__(self, network, address):
@@ -24,13 +27,13 @@ class SendThread(threading.Thread):
             except pickle.UnpicklingError, e:
                 data = " "
                 pickled_msg = pickle.dumps(data)
-                # logging.debug("Pickling Error: %s", e)
+                # logger.debug("Pickling Error: %s", e)
 
             try:
                 self.network.sock_send.sendto(pickled_msg, self.address)
 
             except socket.error, e:
-                # logging.debug("Failed to broadcast: %s", e)
+                # logger.debug("Failed to broadcast: %s", e)
                 # Failsafe
                 break
 

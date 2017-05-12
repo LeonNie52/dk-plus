@@ -9,20 +9,24 @@
 This script is to test the APF method for only one UAV.
 """
 
-import logging, time
-from dronekit import connect, VehicleMode
-from pymavlink import mavutil  # Needed for command message definitions
-
-import sys
+import sys, time, os
 
 sys.path.append("..")
 
+if not os.path.exists('log'):
+    os.mkdir('log')
+
+from dronekit import connect
 from drone_network import Networking
 from collision_avoidance import CollisionThread
 from act_tool import arm_and_takeoff
 import numpy as np
 
-logging.basicConfig(level=logging.INFO)
+import logging
+import logging.config
+
+logging.config.fileConfig("../logging.conf")
+logger = logging.getLogger()
 
 # Set up option parsing to get connection string
 import argparse
@@ -42,17 +46,11 @@ if not connection_string:
     sitl = dronekit_sitl.start_default()
     connection_string = sitl.connection_string()
 
-# logging.basicConfig(level=logging.DEBUG,
-#                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
-#                     datefmt='%a, %d %b %Y %H:%M:%S',
-#                     filename='my.log',
-#                     filemode='w')
-
 # connection_string = 'tcp:192.168.6.46:5763'
 # connection_string = 'tcp:192.168.6.111:5763'
 
 # Connect to the Vehicle
-print 'Connecting to vehicle on: %s' % connection_string
+logger.info('Connecting to vehicle on: %s', connection_string)
 vehicle = connect(connection_string, wait_ready=True)
 
 while not vehicle.home_location:
@@ -62,7 +60,7 @@ while not vehicle.home_location:
     if not vehicle.home_location:
         print " Waiting for home location ..."
 # We have a home location, so print it!
-print "\n Home location: %s" % vehicle.home_location
+logger.info("Home location: %s", vehicle.home_location)
 
 # Create the interface with UDP broadcast sockets
 
@@ -75,29 +73,38 @@ t_collision = CollisionThread(network, algorithm='formation', single=single)
 
 # Get all vehicle attributes (state)
 print "\nGet all vehicle attribute values:"
-print " Autopilot Firmware version: %s" % vehicle.version
-print "System ID：%s" % vehicle.parameters['SYSID_THISMAV']
+logger.info(" Autopilot Firmware version: %s", vehicle.version)
+logger.info("System ID：%s", vehicle.parameters['SYSID_THISMAV'])
 
 # Set the targetLocation for the team, Heading South
 
-t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
-                                   formation_set=np.array([[-25, 0, 25],
-                                                           [0, 0, 0],
-                                                           [0, 0, 0]], dtype=float))
+# Team Home Location
+# Playground
+lat = 39.979352
+lon = 116.339748
 
-# t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
-#                                    formation_set=np.array([[-25, 25],
-#                                                            [0, 0],
-#                                                            [0, 0]], dtype=float))
+# Football Field
+# lat = 39.9790234
+# lon = 116.3407892
 
-t_collision.formation.set_target_Loc(alt=10, dNorth=-100, dEast=0)
+# Formation
+formation_set = np.array([[-20, 0, 20],
+                          [0, 0, 0],
+                          [0, 0, 0]], dtype=float)
+# formation_set = np.array([[-25, 25],
+#                           [0, 0],
+#                           [0, 0]], dtype=float)
 
-logging.info("Initializing interface")
+t_collision.formation.setFormation(lat, lon, formation_set)
+
+t_collision.formation.set_target_Loc(alt=15, dNorth=-100, dEast=0)
+
+logger.info("Initializing interface")
 network.run()
 
-arm_and_takeoff(vehicle, 10)
+arm_and_takeoff(vehicle, 15)
 
-logging.info("Starting collision avoidance scheme")
+logger.info("Starting collision avoidance scheme")
 t_collision.start()
 
 while not t_collision.formation.target_reached:
@@ -105,9 +112,8 @@ while not t_collision.formation.target_reached:
 
 t_collision.changeMode("POSHOLD")
 
-logging.info("Hold Position for %s seconds", 10)
+logger.info("Hold Position for %s seconds", 10)
 time.sleep(10)
-
 
 t_collision.formation.ChangetoHome()
 
