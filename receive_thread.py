@@ -12,7 +12,10 @@ mail: leonidas.antoniou@gmail.com
 
 import threading, select, hashlib, socket, logging
 import cPickle as pickle
+import logging.config
 
+logging.config.fileConfig("../logging.conf")
+logger = logging.getLogger()
 
 class ReceiveThread(threading.Thread):
     def __init__(self, network, msg_queue):
@@ -47,18 +50,18 @@ class ReceiveThread(threading.Thread):
 
                             else:
                                 self.msg_queue.put((data, sender_addr, sender_ip))
-                                # logging.info("Received msg from: %s ; SYSID_THISMAV: %s"
+                                # logger.info("Received msg from: %s ; SYSID_THISMAV: %s"
                                 #              , sender_addr, data.SYSID_THISMAV)
 
                                 self.count += 1
                         else:
-                            logging.warning("Received wrong data, ignoring")
+                            logger.warning("Received wrong data, ignoring")
 
                     except pickle.UnpicklingError:
                         pass
 
             except (select.error, socket.error), e:
-                logging.debug("Error in receive_thread: %s", e)
+                logger.debug("Error in receive_thread: %s", e)
                 # Failsafe
                 break
 

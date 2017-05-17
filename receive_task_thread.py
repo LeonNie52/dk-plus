@@ -11,7 +11,10 @@ mail: leonidas.antoniou@gmail.com
 import threading, Queue, time, logging
 import geo_tools as geo
 from collections import namedtuple
+import logging.config
 
+logging.config.fileConfig("../logging.conf")
+logger = logging.getLogger()
 remote_action = namedtuple("remote_action", "ID action params")
 
 
@@ -69,4 +72,4 @@ class ReceiveTaskThread(threading.Thread):
                 self.msg_queue.task_done()
 
             except Queue.Empty:
-                logging.debug("All messages processed")
+                logger.debug("All messages processed")

@@ -43,6 +43,10 @@ from send_thread import SendThread
 from receive_thread import ReceiveThread
 from receive_task_thread import ReceiveTaskThread
 
+import logging.config
+
+logging.config.fileConfig("../logging.conf")
+logger = logging.getLogger()
 
 class Networking:
     MAX_STAY = 5  # seconds until entry is removed from structure
@@ -94,14 +98,14 @@ class Networking:
         # Start networking protocol
         if self.protocol == "UDP_BROADCAST":
             if self.create_udp_broadcast(self.address):
-                logging.info("Network interface started succesfully")
+                logger.info("Network interface started succesfully")
             else:
-                logging.error("Network interface not started, exit...")
+                logger.error("Network interface not started, exit...")
                 # status -> critical
                 # run failsafe
         else:
             # You can use whatever protocol you want here
-            logging.warning("Unsupported protocol")
+            logger.warning("Unsupported protocol")
             # raise signal
 
         # Start threads
@@ -137,7 +141,7 @@ class Networking:
             exit_status = 1
 
         except socket.error, e:
-            logging.debug("Error in socket operation: %s", e)
+            logger.debug("Error in socket operation: %s", e)
             exit_status = 0
 
         finally:
