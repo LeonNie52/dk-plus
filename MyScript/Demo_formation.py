@@ -80,20 +80,24 @@ print "System ID：%s" % vehicle.parameters['SYSID_THISMAV']
 
 # Set the targetLocation for the team, Heading South
 
-# t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
-#                                    formation_set=np.array([[-20, 0, 20],
-#                                                            [0, 0, 0],
-#                                                            [0, 0, 0]], dtype=float))
-#
-# t_collision.formation.setFormation(lat=39.979352, lon=116.339748,
-#                                    formation_set=np.array([[-25, 25],
-#                                                            [0, 0],
-#                                                            [0, 0]], dtype=float))
+# Team Home Location
+# Playground
+# lat = 39.979352
+# lon = 116.339748
 
-t_collision.formation.setFormation(lat=39.9790234, lon=116.3407892,
-                                   formation_set=np.array([[-20, 20],
-                                                           [0, 0],
-                                                           [0, 0]], dtype=float))
+# Football Field
+lat = 39.9790234
+lon = 116.3407892
+
+# Formation
+# formation_set = np.array([[-20, 0, 20],
+#                           [0, 0, 0],
+#                           [0, 0, 0]], dtype=float)
+formation_set = np.array([[-25, 25],
+                          [0, 0],
+                          [0, 0]], dtype=float)
+
+t_collision.formation.setFormation(lat, lon, formation_set)
 
 t_collision.formation.set_target_Loc(alt=15, dNorth=-40, dEast=0)
 
