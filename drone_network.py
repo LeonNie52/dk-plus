@@ -52,7 +52,7 @@ class Networking:
     MAX_STAY = 5  # seconds until entry is removed from structure
     MAX_ZONE = 500  # metres Consider as the maximum communication range
     NEAR_ZONE = 50  # metres
-    FORMATION_NEAR_ZONE = 15  # metres
+    FORMATION_NEAR_ZONE = 10  # metres
     CRITICAL_ZONE = 10  # metres
     POLL_RATE = 0.1  # how often to broadcast/receive messages
 
