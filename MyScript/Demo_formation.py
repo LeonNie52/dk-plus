@@ -66,8 +66,8 @@ logger.info("Home location: %s", vehicle.home_location)
 
 # Create the interface with UDP broadcast sockets
 
-address = ("192.168.6.255", 54545) # In Laboratory
-# address = ("192.168.2.255", 54545) # In test Field
+# address = ("192.168.6.255", 54545) # In Laboratory
+address = ("192.168.2.255", 54545) # In test Field
 
 network = Networking(address, "UDP_BROADCAST", vehicle)
 
@@ -108,7 +108,7 @@ formation_set = np.array([[-10, 0, 10],
 
 t_collision.formation.setFormation(lat, lon, formation_set)
 
-t_collision.formation.set_target_Loc(alt=re_alt, dNorth=80, dEast=0)
+t_collision.formation.set_target_Loc(alt=re_alt, dNorth=70, dEast=0)
 
 logger.info("Initializing interface")
 network.run()
