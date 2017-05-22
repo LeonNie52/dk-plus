@@ -94,13 +94,13 @@ logger.info("System ID：%s", vehicle.parameters['SYSID_THISMAV'])
 # re_alt = 5  # relative altitude
 
 # Football Field South
-lat = 39.9781622
+lat = 39.9782464
 lon = 116.3408563
 re_alt = 5  # relative altitude
 
 # Formation
 formation_set = np.array([[-10, 0, 10],
-                          [-2.5, 2.5, -2.5],
+                          [-2.5, 5, -2.5],
                           [0, 0, 0]], dtype=float)
 # formation_set = np.array([[-10, 10],
 #                           [0, 0],
@@ -108,7 +108,7 @@ formation_set = np.array([[-10, 0, 10],
 
 t_collision.formation.setFormation(lat, lon, formation_set)
 
-t_collision.formation.set_target_Loc(alt=re_alt, dNorth=100, dEast=0)
+t_collision.formation.set_target_Loc(alt=re_alt, dNorth=80, dEast=0)
 
 logger.info("Initializing interface")
 network.run()
