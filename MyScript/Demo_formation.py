@@ -66,8 +66,8 @@ logger.info("Home location: %s", vehicle.home_location)
 
 # Create the interface with UDP broadcast sockets
 
-# address = ("192.168.6.255", 54545) # In Laboratory
-address = ("192.168.2.255", 54545) # In test Field
+address = ("192.168.6.255", 54545) # In Laboratory
+# address = ("192.168.2.255", 54545) # In test Field
 
 network = Networking(address, "UDP_BROADCAST", vehicle)
 
@@ -84,9 +84,9 @@ logger.info("System ID：%s", vehicle.parameters['SYSID_THISMAV'])
 
 # Team Home Location
 # Playground
-# lat = 39.979352
-# lon = 116.339748
-# re_alt = 10  # relative altitude
+lat = 39.979352
+lon = 116.339748
+re_alt = 10  # relative altitude
 
 # Football Field North
 # lat = 39.9790234
@@ -94,21 +94,26 @@ logger.info("System ID：%s", vehicle.parameters['SYSID_THISMAV'])
 # re_alt = 5  # relative altitude
 
 # Football Field South
-lat = 39.9782464
-lon = 116.3408563
-re_alt = 5  # relative altitude
+# lat = 39.9782464
+# lon = 116.3408563
+# re_alt = 5  # relative altitude
 
 # Formation
-formation_set = np.array([[-10, 0, 10],
-                          [-2.5, 5, -2.5],
+# formation_set = np.array([[-10, 0, 10],
+#                           [-2.5, 5, -2.5],
+#                           [0, 0, 0]], dtype=float)
+
+formation_set = np.array([[-20, 0, 20],
+                          [0, 5, 0],
                           [0, 0, 0]], dtype=float)
+
 # formation_set = np.array([[-10, 10],
 #                           [0, 0],
 #                           [0, 0]], dtype=float)
 
 t_collision.formation.setFormation(lat, lon, formation_set)
 
-t_collision.formation.set_target_Loc(alt=re_alt, dNorth=70, dEast=0)
+t_collision.formation.set_target_Loc(alt=re_alt, dNorth=-70, dEast=0)
 
 logger.info("Initializing interface")
 network.run()
